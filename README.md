@@ -1,26 +1,27 @@
 # Redmine Check-in Automation
 
-An automated DevOps workflow that monitors Redmine issues for updates and sends real-time notifications to a Mattermost team channel using n8n.
+An automated DevOps workflow that monitors Redmine issues and sends scheduled notifications to a Mattermost team channel using n8n.
 
-The project eliminates the need for teams to manually check Redmine for issue changes and provides faster visibility into task updates.
+The project connects Redmine, n8n, and Mattermost to reduce manual issue checking and give development teams faster visibility into task activity and updates.
 
 ---
 
 ## Project Overview
 
-Development teams often manage tasks and incidents in Redmine while communicating through separate team collaboration platforms.
+Development teams often use Redmine for issue and project management while communicating through separate collaboration platforms such as Mattermost.
 
 Without automation, team members may need to repeatedly check Redmine to discover:
 
-- Updated issues
-- Task changes
+- Issue updates
+- Status changes
 - Assignment changes
-- Status updates
+- Priority changes
+- Task activity
 - New issue activity
 
-This project connects **Redmine, n8n, and Mattermost** to automate this process.
+This project automates that communication flow.
 
-When a Redmine issue is updated, n8n detects the change, processes the issue information, and automatically sends a formatted notification to Mattermost.
+The n8n workflow periodically retrieves Redmine issues through the REST API, processes the issue information, checks for update activity, formats the relevant details using JavaScript, and sends a notification to Mattermost.
 
 ---
 
@@ -30,16 +31,17 @@ When a Redmine issue is updated, n8n detects the change, processes the issue inf
 
 ## How It Works
 
-The workflow follows these steps:
+The workflow follows this process:
 
-1. n8n starts the workflow on a schedule.
+1. The Schedule Trigger starts the workflow.
 2. n8n retrieves Redmine issues through the REST API.
 3. Each issue is processed individually.
-4. The workflow retrieves detailed issue information.
-5. An IF condition checks whether the issue has update history.
-6. JavaScript formats the issue information into a readable message.
-7. An HTTP Request sends the message to Mattermost.
-8. The development team receives the notification automatically.
+4. n8n retrieves detailed issue information.
+5. The workflow checks the issue journal for update activity.
+6. An IF condition determines whether the issue should continue.
+7.JavaScript formats the issue information into a readable notification.
+8. An HTTP Request sends the notification to the configured Mattermost Incoming Webhook.
+9. The development team receives the notification in Mattermost.
 
 ---
 
@@ -81,27 +83,25 @@ Team Notification
 
 ## Update Detection
 
-The workflow checks the Redmine issue journal to determine whether an issue contains update activity.
+The current workflow checks the Redmine issue journal for update activity.
 
-```javascript
 {{$json.issue.journals.length}}
-```
 
-The condition is:
+The condition used by the workflow is:
 
-```text
 journals.length > 0
+
+This allows issues containing journal activity to continue through the notification workflow.
 ```
 
-This ensures that only issues containing update activity continue to the notification stage.
+Note: This implementation checks whether an issue has journal activity. A future improvement is to track the last processed updated_on timestamp so that the workflow only notifies the team about changes that occurred since the previous execution.
 
 ---
 
 ## Example Notification
 
-When an issue is updated, Mattermost receives a message similar to:
+A Mattermost notification can contain information such as:
 
-```text
 Redmine Issue Updated
 
 Issue: Fix Kubernetes Deployment
@@ -110,9 +110,8 @@ Priority: Normal
 Assigned To: John Doe
 Project: DevOps Team
 Issue ID: 1
-```
 
-This gives the team the important information without requiring them to open Redmine.
+This provides the team with important issue information without requiring them to manually open Redmine.
 
 ---
 
@@ -226,16 +225,23 @@ redmine-checkin-automation/
 
 ## Configuration
 
-The project requires:
+The local environment requires:
 
 - Docker Desktop
 - Redmine
 - n8n
 - MySQL
-- Redmine API access
+- Redmine REST API access
 - Mattermost Incoming Webhook
 
-Credentials and secrets should be configured through environment variables, Docker secrets, or n8n credentials.
+Credentials should be stored securely using:
+
+- n8n credentials
+- Environment variables
+- Docker secrets
+- Secure deployment configuration
+
+Never hard-code credentials directly inside workflow nodes or source files.
 
 ---
 
@@ -243,30 +249,52 @@ Credentials and secrets should be configured through environment variables, Dock
 
 Never commit sensitive credentials to GitHub.
 
-Do not expose:
+Sensitive information includes:
 
-```text
 API keys
 Passwords
 Mattermost webhook URLs
 Database passwords
 Access tokens
+Private keys
 .env files
-Private credentials
+Credential files
+
+If a secret is accidentally committed or exposed, revoke or regenerate it immediately.
 ```
 
 Use `.gitignore` to prevent accidental commits of sensitive files.
 
 Example:
 
-```gitignore
+The repository should include a .gitignore similar to:
+
+# Environment variables
 .env
-*.env
 .env.*
+!.env.example
+
+# Credentials and secrets
 credentials.json
 secrets/
 *.key
 *.pem
+*.crt
+
+# n8n local data
+.n8n/
+
+# Logs
+*.log
+logs/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
 ```
 
 ---
@@ -289,7 +317,7 @@ For example:
 Fix Kubernetes Deployment
 ```
 
-### Step 3 — Add an update
+### Step 3 — Update the Issue
 
 Example:
 
@@ -309,11 +337,11 @@ The updated issue should appear automatically in the configured Mattermost chann
 
 ---
 
-## Production Automation
+## Scheduled Automation
 
 After successful testing, the n8n Schedule Trigger can be configured to run every 5 minutes.
 
-The production flow becomes:
+The scheduled workflow becomes:
 
 ```text
 Redmine
@@ -334,7 +362,7 @@ Send Mattermost Notification
 Development Team
 ```
 
-This allows the team to receive important Redmine updates without manually checking the project.
+This allows the team to receive automated updates without repeatedly checking Redmine manually.
 
 ---
 
@@ -410,15 +438,31 @@ This improves visibility, reduces manual checking, and helps teams respond to ch
 
 ---
 
+## mplemented Features
+
+Redmine REST API integration 
+✓ n8n workflow automation 
+✓ Scheduled issue retrieval 
+✓ Issue-by-issue processing 
+✓ Issue journal/activity detection
+✓ Conditional workflow logic
+✓ JavaScript message formatting
+✓ Mattermost notifications
+✓ Docker-based local environment
+✓ Docker Compose
+✓ Secure credential configuration
+
+
 ## Future Improvements
 
 Potential improvements include:
 
-- Automatic error notifications
-- Status-change detection
-- Priority-change detection
-- New issue notifications
-- Assignment-change notifications
+- Track updated_on timestamps
+- Prevent duplicate notifications
+- Detect specific status changes
+- Detect priority changes
+- Detect assignment changes
+- Detect newly created issues
 - Rich Mattermost messages
 - User-specific notifications
 - Redmine webhook triggers
