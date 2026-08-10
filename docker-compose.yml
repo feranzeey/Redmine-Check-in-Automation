@@ -1,0 +1,46 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: redmine-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: redmine
+      MYSQL_DATABASE: redmine
+      MYSQL_USER: redmine
+      MYSQL_PASSWORD: redmine
+    volumes:
+      - db_data:/var/lib/mysql
+
+  redmine:
+    image: redmine:latest
+    container_name: redmine
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "3000:3000"
+    environment:
+      REDMINE_DB_MYSQL: db
+      REDMINE_DB_DATABASE: redmine
+      REDMINE_DB_USERNAME: redmine
+      REDMINE_DB_PASSWORD: redmine
+    volumes:
+      - redmine_data:/usr/src/redmine/files
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+volumes:
+  db_data:
+  redmine_data:
+  n8n_data:
