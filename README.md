@@ -28,41 +28,6 @@ When a Redmine issue is updated, n8n detects the change, processes the issue inf
 
 ![Redmine Check-in Automation Architecture](screenshots/redmine-checkin-architecture.png)
 
-```text
-                 ┌──────────────────┐
-                 │     Redmine      │
-                 │  Issue Tracking  │
-                 └────────┬─────────┘
-                          │
-                          │ REST API
-                          ▼
-                 ┌──────────────────┐
-                 │       n8n        │
-                 │ Workflow Engine  │
-                 └────────┬─────────┘
-                          │
-              ┌───────────┴───────────┐
-              │                       │
-              ▼                       ▼
-       Get Issue Details        Check Updates
-              │                       │
-              └───────────┬───────────┘
-                          ▼
-                 ┌──────────────────┐
-                 │ JavaScript Logic │
-                 │ Format Message   │
-                 └────────┬─────────┘
-                          │
-                          │ HTTP Webhook
-                          ▼
-                 ┌──────────────────┐
-                 │    Mattermost    │
-                 │ Team Notification│
-                 └──────────────────┘
-```
-
----
-
 ## How It Works
 
 The workflow follows these steps:
