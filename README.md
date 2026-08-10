@@ -26,6 +26,8 @@ When a Redmine issue is updated, n8n detects the change, processes the issue inf
 
 ## Architecture
 
+![Redmine Check-in Automation Architecture](screenshots/redmine-checkin-architecture.png.png)
+
 ```text
                  ┌──────────────────┐
                  │     Redmine      │
