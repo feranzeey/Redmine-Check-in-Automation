@@ -1,0 +1,264 @@
+{
+  "name": "Automated Redmine Check-In Broadcaster",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */5 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1872,
+        -448
+      ],
+      "id": "5d6689cd-1459-4cc1-89dd-72c7321a09e4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/issues.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status_id",
+              "value": "*"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Redmine-API-Key",
+              "value": "07a8b93e46094bb8f9ea19d1d0279a70131e6f71"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1648,
+        -448
+      ],
+      "id": "962a656a-c5c2-4f86-8dbf-dcaadb9b014a",
+      "name": "Get Updated Issues"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "$json.issues",
+        "include": "",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        -464
+      ],
+      "id": "c66c415e-89e3-4311-80ba-ab90c4d4b331",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:3000/issues/{{$json.issues.id}}.json?include=journals",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "include",
+              "value": "journals"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Redmine-API-Key",
+              "value": "07a8b93e46094bb8f9ea19d1d0279a70131e6f71"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1056,
+        -512
+      ],
+      "id": "c65c0f9e-edd1-4abc-9633-6367f7130726",
+      "name": "Get Issue Details"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2b446977-b881-452e-9058-edb532c70ca7",
+              "leftValue": "={{$json.issue.journals.length}}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -800,
+        -464
+      ],
+      "id": "87a5a349-1141-4140-8932-1fdd09b6f2fc",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const issue = $json.issue;\n\nreturn {\n  json: {\n    message: `Redmine Issue Updated\n\nIssue: ${issue.subject}\nStatus: ${issue.status.name}\nPriority: ${issue.priority.name}\nAssigned To: ${issue.assigned_to?.name || \"Unassigned\"}\nProject: ${issue.project.name}\nIssue ID: ${issue.id}`\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        -592
+      ],
+      "id": "7789cfdb-1a2e-4475-bc48-4ca7aac62ffd",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://preview-oj5um344.cloud.mattermost.com/hooks/egnecizn5iy85npbbxwbbpoznc",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{$json.message}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -336,
+        -496
+      ],
+      "id": "ab8df12c-cbd2-4a2c-908b-0ce5d11bdff5",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Updated Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Updated Issues": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Get Issue Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Issue Details": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "51516a60-9254-4fba-903e-63814752186b",
+  "meta": {
+    "instanceId": "646a3f03b0b9aa2259bc400176e867023bb448025f0745517d114b6cb83b5b33"
+  },
+  "nodeGroups": [],
+  "id": "UgAq2lrToEtYiA5k",
+  "tags": []
+}

@@ -1,64 +1,11 @@
-# Environment variables and secrets
+cat > .gitignore <<'EOF'
 .env
-.env.*
-!.env.example
-
-# Credentials and private configuration
-*.pem
-*.key
-*.crt
-credentials.json
-secrets.json
-
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.venv/
-venv/
-env/
-
-# Node / n8n
-node_modules/
+*.env
 .n8n/
-
-# Logs
-*.log
-logs/
-
-# OS files
+node_modules/
+credentials/
+secrets/
+*.key
+*.pem
 .DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE / Editor
-.vscode/
-.idea/
-
-# Temporary files
-*.tmp
-*.temp
-*.swp
-*.bak
-
-# Docker
-docker-compose.override.yml
-
-# Database files
-*.sqlite
-*.sqlite3
-*.db
-
-# Test / coverage
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Build / distribution
-dist/
-build/
-*.egg-info/
-
-# Local project data
-incidents/
+EOF

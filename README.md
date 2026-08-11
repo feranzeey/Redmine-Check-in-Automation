@@ -203,11 +203,9 @@ redmine-checkin-automation/
 ├── README.md
 ├── docker-compose.yml
 │
-├── docs/
-│   ├── architecture.md
-│   ├── setup.md
-│   ├── workflow.md
-│   └── testing.md
+├── Workflows/
+│   ├── Automated Redmine check-in-automation
+│
 │
 └── screenshots/
     ├── n8n-with-issues-tracking.png
