@@ -151,14 +151,14 @@ The workflow detects activity from Redmine issue data.
 
 The automation currently handles:
 
-- ✅ Status changes
-- ✅ Progress / `% Done` changes
-- ✅ Comments
-- ✅ Journal activity
-- ✅ Time logged
-- ✅ Activity merging
-- ✅ Activity filtering
-- ✅ Mattermost message formatting
+-  Status changes
+-  Progress / `% Done` changes
+-  Comments
+-  Journal activity
+-  Time logged
+-  Activity merging
+-  Activity filtering
+-  Mattermost message formatting
 
 Time entries are retrieved using the issue ID so that the workflow associates logged work with the correct Redmine issue.
 
@@ -281,13 +281,13 @@ Mattermost
 ### Test Result
 
 ```text
-Redmine issue updated       ✅
-Status change detected      ✅
-Comment detected            ✅
-Time entry detected         ✅
-Activity merged             ✅
-Mattermost message created  ✅
-Mattermost delivery         ✅
+Redmine issue updated       
+Status change detected      
+Comment detected            
+Time entry detected         
+Activity merged             
+Mattermost message created  
+Mattermost delivery         
 ```
 
 ---
@@ -342,7 +342,7 @@ docker compose logs n8n
 
 ---
 
-# 🌐 Application Access
+#  Application Access
 
 ### Redmine
 
@@ -476,7 +476,7 @@ Screenshots include:
 
 ---
 
-# ✅ Implemented Features
+#  Implemented Features
 
 - [x] Redmine REST API integration
 - [x] n8n workflow automation
@@ -520,7 +520,7 @@ The core automation is working. The following improvements can further harden th
 
 ---
 
-# 💼 Business Value
+#  Business Value
 
 The automation reduces repetitive manual work by automatically communicating Redmine activity to the development team.
 
