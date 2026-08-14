@@ -1,11 +1,10 @@
-cat > .gitignore <<'EOF'
 .env
+.env.*
 *.env
-.n8n/
-node_modules/
-credentials/
-secrets/
+credentials.json
+secrets.json
+*secret*
 *.key
 *.pem
-.DS_Store
-EOF
+.n8n/
+node_modules/

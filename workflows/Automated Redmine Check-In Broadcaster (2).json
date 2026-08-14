@@ -1,0 +1,445 @@
+{
+  "name": "Automated Redmine Check-In Broadcaster",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 9 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 0 17 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -4096,
+        -720
+      ],
+      "id": "5d6689cd-1459-4cc1-89dd-72c7321a09e4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/issues.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            },
+            {
+              "name": "project_id",
+              "value": "1"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Redmine-API-Key",
+              "value": "YOUR_REDMINE_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -3888,
+        -720
+      ],
+      "id": "962a656a-c5c2-4f86-8dbf-dcaadb9b014a",
+      "name": "Get Updated Issues"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "$json.issues",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -3664,
+        -720
+      ],
+      "id": "c66c415e-89e3-4311-80ba-ab90c4d4b331",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "url": "=http://host.docker.internal:3000/issues/{{$json.id}}.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "include",
+              "value": "journals"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Redmine-API-Key",
+              "value": "YOUR_REDMINE_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -3440,
+        -720
+      ],
+      "id": "c65c0f9e-edd1-4abc-9633-6367f7130726",
+      "name": "Get Issue Details",
+      "notes": "Testing automated Redmine activity detection for Mattermost."
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const issue = item.json.issue;\n  const journals = issue.journals || [];\n\n  const activities = [];\n\n  for (const journal of journals) {\n    const author = journal.user?.name || 'Unknown';\n    const createdOn = journal.created_on;\n\n    for (const detail of journal.details || []) {\n\n      if (detail.name === 'status_id') {\n        activities.push({\n          type: 'status_changed',\n          author: author,\n          old_value: detail.old_value,\n          new_value: detail.new_value,\n          created_on: createdOn\n        });\n      }\n\n      if (detail.name === 'done_ratio') {\n        activities.push({\n          type: 'progress_changed',\n          author: author,\n          old_value: detail.old_value,\n          new_value: detail.new_value,\n          created_on: createdOn\n        });\n      }\n    }\n\n    if (journal.notes && journal.notes.trim() !== '') {\n      activities.push({\n        type: 'comment_added',\n        author: author,\n        note: journal.notes,\n        created_on: createdOn\n      });\n    }\n  }\n\n  output.push({\n    json: {\n      issue: issue,\n      activities: activities\n    }\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3216,
+        -816
+      ],
+      "id": "3199c08b-6241-48a9-86dc-393b2876fd4b",
+      "name": "Detect Activity"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:3000/time_entries.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "issue_id",
+              "value": "={{$json.issue.id}}"
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Redmine-API-Key",
+              "value": "YOUR_REDMINE_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -3216,
+        -624
+      ],
+      "id": "63779439-6855-4b88-b291-e204eebd4a8e",
+      "name": "Get Time Entries"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -2992,
+        -720
+      ],
+      "id": "ff8d3306-1dfc-45be-8895-7b1c44c10151",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of $input.all()) {\n  const issue = item.json.issue;\n  const activities = [...(item.json.activities || [])];\n  const timeEntries = item.json.time_entries || [];\n\n  // Convert logged time into an activity\n  for (const entry of timeEntries) {\n    activities.push({\n      type: 'time_logged',\n      author: entry.user?.name || 'Unknown',\n      hours: entry.hours,\n      comments: entry.comments || '',\n      spent_on: entry.spent_on || null,\n      activity_id: entry.id\n    });\n  }\n\n  results.push({\n    json: {\n      issue,\n      activities,\n      has_activity: activities.length > 0\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2544,
+        -720
+      ],
+      "id": "1e99ad01-38a8-4bce-a69e-fa174fe521b2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "fa220f88-9079-4de9-b82d-f29a5514080f",
+              "leftValue": "={{$json.has_activity}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2320,
+        -720
+      ],
+      "id": "811a8f94-7085-4e46-b238-5ed427d092c2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const data = item.json;\n\n  // Support both nested and flattened issue structures\n  const issue = data.issue || data;\n\n  const activities = data.activities || [];\n\n  const projectName =\n    issue.project?.name ||\n    data.project?.name ||\n    'Unknown';\n\n  const subject =\n    issue.subject ||\n    data.subject ||\n    'Unknown';\n\n  const priority =\n    issue.priority?.name ||\n    data.priority?.name ||\n    'Unknown';\n\n  const status =\n    issue.status?.name ||\n    data.status?.name ||\n    'Unknown';\n\n  const issueId =\n    issue.id ||\n    data.id ||\n    'Unknown';\n\n  const activityText = activities.map(activity => {\n    switch (activity.type) {\n      case 'status_changed':\n        return `• Status changed: ${activity.old_value || 'Unknown'} → ${activity.new_value || 'Unknown'} by ${activity.author}`;\n\n      case 'progress_changed':\n        return `• Progress changed: ${activity.old_value || '0'}% → ${activity.new_value || '0'}% by ${activity.author}`;\n\n      case 'comment_added':\n        return `• Comment added by ${activity.author}: ${activity.note}`;\n\n      case 'time_logged':\n        return `• Time logged: ${activity.hours}h by ${activity.author}${activity.comments ? ` — ${activity.comments}` : ''}`;\n\n      default:\n        return `• Activity: ${activity.type}`;\n    }\n  }).join('\\n');\n\n  output.push({\n    json: {\n      issue_id: issueId,\n      project: projectName,\n      subject: subject,\n      priority: priority,\n      status: status,\n\n      message: `### Redmine Check-in Update\n\n**Project:** ${projectName}\n\n**Issue:** #${issueId} — ${subject}\n\n**Priority:** ${priority}\n\n**Status:** ${status}\n\n**Activity:**\n${activityText}`\n    }\n  });\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2096,
+        -880
+      ],
+      "id": "50156e4a-8c2a-4480-8db9-d963f47f5da0",
+      "name": "Format Mattermost Message"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_MATTERMOST_WEBHOOK_URL",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{$json.message}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1824,
+        -720
+      ],
+      "id": "a2bf1568-ee96-45c0-adea-64f708bbf20b",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.issue.project.name }}",
+                    "rightValue": "DevOps Team",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "0f22d4ac-d3d0-4d56-9fc4-fd949665e414"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2096,
+        -672
+      ],
+      "id": "0749900a-2fe6-4722-b193-bf9058a796c5",
+      "name": "Switch"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Updated Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Updated Issues": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Get Issue Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Issue Details": {
+      "main": [
+        [
+          {
+            "node": "Detect Activity",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Time Entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Activity": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Time Entries": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Mattermost Message": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Format Mattermost Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "75608e58-82fd-471d-a015-3c6410f287c7",
+  "meta": {
+    "instanceId": "646a3f03b0b9aa2259bc400176e867023bb448025f0745517d114b6cb83b5b33"
+  },
+  "nodeGroups": [],
+  "id": "UgAq2lrToEtYiA5k",
+  "tags": []
+}
