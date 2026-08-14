@@ -1,57 +1,113 @@
 # Redmine Check-in Automation
 
-An automated DevOps workflow that monitors Redmine issues and sends scheduled notifications to a Mattermost team channel using n8n.
+An automated DevOps workflow that monitors Redmine issues, detects meaningful issue activity, and sends structured check-in notifications to Mattermost using n8n.
 
-The project connects Redmine, n8n, and Mattermost to reduce manual issue checking and give development teams faster visibility into task activity and updates.
-
----
-
-## Project Overview
-
-Development teams often use Redmine for issue and project management while communicating through separate collaboration platforms such as Mattermost.
-
-Without automation, team members may need to repeatedly check Redmine to discover:
-
-- Issue updates
-- Status changes
-- Assignment changes
-- Priority changes
-- Task activity
-- New issue activity
-
-This project automates that communication flow.
-
-The n8n workflow periodically retrieves Redmine issues through the REST API, processes the issue information, checks for update activity, formats the relevant details using JavaScript, and sends a notification to Mattermost.
+The project integrates **Redmine, n8n, and Mattermost** to reduce manual issue checking and give development teams faster visibility into task progress, comments, status changes, and logged work.
 
 ---
 
-## Architecture
+##  Project Overview
+
+Development teams often use Redmine for issue and project management while communicating through collaboration platforms such as Mattermost.
+
+Without automation, engineers and team leads may need to repeatedly check Redmine to identify:
+
+- Issue status changes
+- Progress updates
+- Comments
+- Time logged
+- Issue activity
+- Task updates
+
+This project automates that process.
+
+The n8n workflow periodically retrieves Redmine issues through the REST API, processes each issue, retrieves detailed issue information and time entries, detects activity, formats the relevant information using JavaScript, and delivers a structured notification to Mattermost.
+
+### Automation Flow
+
+```text
+Redmine
+   │
+   ▼
+n8n Schedule Trigger
+   │
+   ▼
+Retrieve Issues
+   │
+   ▼
+Process Individual Issues
+   │
+   ▼
+Retrieve Issue Details
+   │
+   ├── Journals
+   └── Time Entries
+   │
+   ▼
+Detect Activity
+   │
+   ▼
+Merge Activity
+   │
+   ▼
+Filter Activity
+   │
+   ▼
+Format Notification
+   │
+   ▼
+Mattermost
+   │
+   ▼
+Development Team
+```
+
+---
+
+##   Architecture
 
 ![Redmine Check-in Automation Architecture](screenshots/redmine-checkin-architecture.png)
 
-## How It Works
+### Components
 
-The workflow follows this process:
-
-1. The Schedule Trigger starts the workflow.
-2. n8n retrieves Redmine issues through the REST API.
-3. Each issue is processed individually.
-4. n8n retrieves detailed issue information.
-5. The workflow checks the issue journal for update activity.
-6. An IF condition determines whether the issue should continue.
-7.JavaScript formats the issue information into a readable notification.
-8. An HTTP Request sends the notification to the configured Mattermost Incoming Webhook.
-9. The development team receives the notification in Mattermost.
+| Component | Responsibility |
+|---|---|
+| Redmine | Issue and project management |
+| n8n | Workflow orchestration and automation |
+| Redmine REST API | Issue, journal, and time-entry data |
+| JavaScript | Activity processing and message formatting |
+| Mattermost | Team notification and collaboration |
+| Docker | Containerized development environment |
+| Docker Compose | Multi-container orchestration |
+| MySQL | Redmine database |
 
 ---
 
-## Workflow
+##  How It Works
+
+The workflow follows these steps:
+
+1. The **Schedule Trigger** starts the workflow.
+2. n8n retrieves Redmine issues through the REST API.
+3. Issues are processed individually.
+4. Detailed issue information is retrieved.
+5. Redmine journals are inspected for activity.
+6. Time entries are retrieved for the specific issue.
+7. Activity from the different sources is merged.
+8. The workflow determines whether meaningful activity exists.
+9. JavaScript formats the activity into a readable notification.
+10. An HTTP Request sends the notification to Mattermost.
+11. The development team receives the check-in update.
+
+---
+
+#  Workflow
 
 ```text
 Schedule Trigger
        │
        ▼
-Get Redmine Issues
+Get Updated Issues
        │
        ▼
 Split Issues
@@ -59,81 +115,186 @@ Split Issues
        ▼
 Get Issue Details
        │
-       ▼
-Check Issue Updates
-       │
-       ▼
-      IF
-       │
-       │ True
-       ▼
-Code in JavaScript
-       │
-       ▼
-HTTP Request
-       │
-       ▼
-Mattermost
-       │
-       ▼
-Team Notification
+       ├───────────────┐
+       ▼               ▼
+Detect Activity   Get Time Entries
+       │               │
+       └───────┬───────┘
+               ▼
+             Merge
+               │
+               ▼
+       Activity Filtering
+               │
+               ▼
+              IF
+               │
+            True
+               │
+               ▼
+      Format Mattermost
+               │
+               ▼
+         HTTP Request
+               │
+               ▼
+          Mattermost
 ```
 
 ---
 
-## Update Detection
+#  Activity Detection
 
-The current workflow checks the Redmine issue journal for update activity.
+The workflow detects activity from Redmine issue data.
 
-{{$json.issue.journals.length}}
+### Supported Activity
 
-The condition used by the workflow is:
+The automation currently handles:
 
-journals.length > 0
+- ✅ Status changes
+- ✅ Progress / `% Done` changes
+- ✅ Comments
+- ✅ Journal activity
+- ✅ Time logged
+- ✅ Activity merging
+- ✅ Activity filtering
+- ✅ Mattermost message formatting
 
-This allows issues containing journal activity to continue through the notification workflow.
+Time entries are retrieved using the issue ID so that the workflow associates logged work with the correct Redmine issue.
+
+Example request:
+
+```text
+GET /time_entries.json
+
+Query Parameters:
+issue_id = {{$json.issue.id}}
+limit = 100
 ```
-
-Note: This implementation checks whether an issue has journal activity. A future improvement is to track the last processed updated_on timestamp so that the workflow only notifies the team about changes that occurred since the previous execution.
 
 ---
 
-## Example Notification
+#  Activity Processing
 
-A Mattermost notification can contain information such as:
+The workflow combines activity from Redmine journals and time entries before generating the final notification.
 
-Redmine Issue Updated
+Conceptually:
 
-Issue: Fix Kubernetes Deployment
-Status: New
-Priority: Normal
-Assigned To: John Doe
+```text
+Redmine Issue
+      │
+      ├── Journal Activity
+      │
+      └── Time Entries
+             │
+             ▼
+        Activity Merge
+             │
+             ▼
+       Activity Detection
+             │
+             ▼
+        Notification
+```
+
+This allows a single Mattermost message to provide a consolidated view of what happened on an issue.
+
+---
+
+#  Example Mattermost Notification
+
+Example notification generated by the workflow:
+
+```text
+Redmine Check-in Update
+
 Project: DevOps Team
-Issue ID: 1
 
-This provides the team with important issue information without requiring them to manually open Redmine.
+Issue: #1 — Fix Kubernetes Deployment
+
+Priority: Normal
+
+Status: In Progress
+
+Activity:
+• Comment added by Oluwaferanmi Dada:
+  Testing automated Redmine check-in notification.
+
+• Status changed: 1 → 2 by Oluwaferanmi Dada
+
+• Time logged: 1h by Oluwaferanmi Dada —
+  Testing automated Redmine check-in
+```
+
+The notification gives the development team useful issue information without requiring them to manually open Redmine.
 
 ---
 
-## Technologies
+#  End-to-End Testing
 
-| Technology | Purpose |
-|---|---|
-| Redmine | Issue and project management |
-| n8n | Workflow automation |
-| Mattermost | Team notifications |
-| Docker | Containerization |
-| Docker Compose | Multi-container environment |
-| MySQL | Redmine database |
-| JavaScript | Message processing |
-| REST API | Redmine integration |
-| Webhooks | Mattermost notification delivery |
+The workflow has been tested using a real Redmine issue.
+
+### Test Scenario
+
+A test issue was updated with:
+
+```text
+Issue:
+Fix Kubernetes Deployment
+
+Status:
+New → In Progress
+
+Comment:
+Testing automated Redmine check-in.
+
+Time:
+1 hour
+```
+
+The workflow successfully processed the activity and delivered a notification to Mattermost.
+
+### Verified Flow
+
+```text
+Redmine
+   │
+   ▼
+n8n
+   │
+   ▼
+Issue Activity Detection
+   │
+   ▼
+Time Entry Retrieval
+   │
+   ▼
+Activity Merge
+   │
+   ▼
+Message Formatting
+   │
+   ▼
+Mattermost
+```
+
+### Test Result
+
+```text
+Redmine issue updated       ✅
+Status change detected      ✅
+Comment detected            ✅
+Time entry detected         ✅
+Activity merged             ✅
+Mattermost message created  ✅
+Mattermost delivery         ✅
+```
 
 ---
 
-## Docker Environment
+#  Docker Environment
 
-The project uses Docker Compose to run the local environment.
+The project uses Docker Compose to provide the local development environment.
 
 ### Services
 
@@ -143,35 +304,37 @@ n8n
 MySQL
 ```
 
-Check running containers:
+### Check Running Containers
 
 ```bash
 docker compose ps
 ```
 
-Start the environment:
+### Start the Environment
 
 ```bash
 docker compose up -d
 ```
 
-Stop the environment:
+### Stop the Environment
 
 ```bash
 docker compose down
 ```
 
-View container logs:
+### View All Logs
 
 ```bash
 docker compose logs
 ```
 
-View logs for a specific service:
+### View Redmine Logs
 
 ```bash
 docker compose logs redmine
 ```
+
+### View n8n Logs
 
 ```bash
 docker compose logs n8n
@@ -179,7 +342,7 @@ docker compose logs n8n
 
 ---
 
-## Application Access
+# 🌐 Application Access
 
 ### Redmine
 
@@ -195,7 +358,7 @@ http://localhost:5678
 
 ---
 
-## Project Structure
+#  Project Structure
 
 ```text
 redmine-checkin-automation/
@@ -204,8 +367,7 @@ redmine-checkin-automation/
 ├── docker-compose.yml
 │
 ├── Workflows/
-│   ├── Automated Redmine check-in-automation
-│
+│   └── Automated Redmine check-in-automation
 │
 └── screenshots/
     ├── n8n-with-issues-tracking.png
@@ -221,7 +383,7 @@ redmine-checkin-automation/
 
 ---
 
-## Configuration
+#  Configuration
 
 The local environment requires:
 
@@ -234,21 +396,22 @@ The local environment requires:
 
 Credentials should be stored securely using:
 
-- n8n credentials
-- Environment variables
-- Docker secrets
+- n8n Credentials
+- Environment Variables
+- Docker Secrets
 - Secure deployment configuration
 
 Never hard-code credentials directly inside workflow nodes or source files.
 
 ---
 
-## Security
+#  Security
 
-Never commit sensitive credentials to GitHub.
+Sensitive credentials must never be committed to GitHub.
 
 Sensitive information includes:
 
+```text
 API keys
 Passwords
 Mattermost webhook URLs
@@ -257,16 +420,13 @@ Access tokens
 Private keys
 .env files
 Credential files
-
-If a secret is accidentally committed or exposed, revoke or regenerate it immediately.
 ```
 
-Use `.gitignore` to prevent accidental commits of sensitive files.
+If a secret is accidentally committed or exposed, revoke or regenerate it immediately.
 
-Example:
+### Recommended `.gitignore`
 
-The repository should include a .gitignore similar to:
-
+```gitignore
 # Environment variables
 .env
 .env.*
@@ -297,182 +457,127 @@ Thumbs.db
 
 ---
 
-## Testing
+#  Screenshots
 
-To test the automation:
+The `screenshots/` directory contains visual evidence of the implementation.
 
-### Step 1 — Open Redmine
-
-```text
-http://localhost:3000
-```
-
-### Step 2 — Open an existing issue
-
-For example:
-
-```text
-Fix Kubernetes Deployment
-```
-
-### Step 3 — Update the Issue
-
-Example:
-
-```text
-Monitoring progress updated.
-```
-
-Save the issue.
-
-### Step 4 — Run the n8n workflow
-
-Execute the workflow manually during testing.
-
-### Step 5 — Verify Mattermost
-
-The updated issue should appear automatically in the configured Mattermost channel.
-
----
-
-## Scheduled Automation
-
-After successful testing, the n8n Schedule Trigger can be configured to run every 5 minutes.
-
-The scheduled workflow becomes:
-
-```text
-Redmine
-   │
-   ▼
-Scheduled n8n Workflow
-   │
-   ▼
-Detect Issue Updates
-   │
-   ▼
-Process Issue
-   │
-   ▼
-Send Mattermost Notification
-   │
-   ▼
-Development Team
-```
-
-This allows the team to receive automated updates without repeatedly checking Redmine manually.
-
----
-
-## Screenshots
-
-The `screenshots/` directory contains visual documentation of the implementation, including:
+Screenshots include:
 
 - Redmine issue management
 - Redmine project configuration
 - Redmine user activity
 - n8n Docker deployment
-- Redmine API configuration
+- Redmine REST API configuration
 - Redmine API requests
 - n8n workflow automation
-- Scheduled workflow publishing
-- Issue tracking automation
+- Scheduled workflow
+- Mattermost notification
+- Issue activity processing
 
 ---
 
-## Key DevOps Concepts Demonstrated
+# ✅ Implemented Features
 
-This project demonstrates practical experience with:
-
-- Workflow automation
-- REST API integration
-- Docker containerization
-- Docker Compose
-- Scheduled automation
-- Conditional workflow logic
-- JavaScript automation
-- HTTP APIs
-- Webhooks
-- Issue tracking
-- Team notifications
-- Infrastructure automation
-- Secure credential management
+- [x] Redmine REST API integration
+- [x] n8n workflow automation
+- [x] Scheduled workflow execution
+- [x] Redmine issue retrieval
+- [x] Issue-by-issue processing
+- [x] Issue detail retrieval
+- [x] Journal/activity retrieval
+- [x] Status change detection
+- [x] Progress change detection
+- [x] Comment detection
+- [x] Time-entry retrieval
+- [x] Activity merging
+- [x] Activity filtering
+- [x] Conditional workflow logic
+- [x] JavaScript activity processing
+- [x] Mattermost message formatting
+- [x] Mattermost webhook delivery
+- [x] Docker environment
+- [x] Docker Compose
+- [x] Secure credential placeholders
+- [x] End-to-end workflow testing
 
 ---
 
-## Business Value
+# 🔧 Production Hardening / Next Improvements
 
-The automation reduces repetitive manual work by automatically communicating Redmine changes to the development team.
+The core automation is working. The following improvements can further harden the workflow for production use:
 
-Instead of:
+- [ ] Persistent reporting-window state
+- [ ] Cross-run duplicate prevention / idempotency
+- [ ] Department-to-Mattermost channel routing
+- [ ] Final 5 PM / 8 PM / EOD reporting schedule
+- [ ] Retry and error-handling strategy
+- [ ] Workflow execution monitoring
+- [ ] Automated tests
+- [ ] CI/CD integration
+- [ ] Redmine webhook-based triggering
+- [ ] Richer Mattermost notifications
+- [ ] Daily summary reports
+
+---
+
+# 💼 Business Value
+
+The automation reduces repetitive manual work by automatically communicating Redmine activity to the development team.
+
+### Manual Process
 
 ```text
 Engineer
-   ↓
+   │
+   ▼
 Open Redmine
-   ↓
+   │
+   ▼
 Check Issues
-   ↓
+   │
+   ▼
 Find Changes
-   ↓
+   │
+   ▼
 Notify Team
 ```
 
-The automated process is:
+### Automated Process
 
 ```text
 Redmine
-   ↓
-n8n detects update
-   ↓
+   │
+   ▼
+n8n detects activity
+   │
+   ▼
 Issue processed
-   ↓
+   │
+   ▼
+Activity formatted
+   │
+   ▼
 Mattermost notification
-   ↓
+   │
+   ▼
 Team informed
 ```
 
-This improves visibility, reduces manual checking, and helps teams respond to changes faster.
+### Benefits
+
+- Faster visibility into issue activity
+- Reduced manual checking
+- Centralized team notifications
+- Consistent status communication
+- Automated time-entry reporting
+- Better collaboration between development teams
+- Extensible DevOps automation architecture
 
 ---
 
-## mplemented Features
+#  DevOps Concepts Demonstrated
 
-Redmine REST API integration 
-✓ n8n workflow automation 
-✓ Scheduled issue retrieval 
-✓ Issue-by-issue processing 
-✓ Issue journal/activity detection
-✓ Conditional workflow logic
-✓ JavaScript message formatting
-✓ Mattermost notifications
-✓ Docker-based local environment
-✓ Docker Compose
-✓ Secure credential configuration
-
-
-## Future Improvements
-
-Potential improvements include:
-
-- Track updated_on timestamps
-- Prevent duplicate notifications
-- Detect specific status changes
-- Detect priority changes
-- Detect assignment changes
-- Detect newly created issues
-- Rich Mattermost messages
-- User-specific notifications
-- Redmine webhook triggers
-- Automated daily reports
-- Workflow monitoring
-- Error recovery
-- CI/CD integration
-- Automated testing
-
----
-
-## Skills Demonstrated
+This project demonstrates practical experience with:
 
 ```text
 Docker
@@ -484,26 +589,31 @@ REST APIs
 JavaScript
 Webhooks
 Workflow Automation
-DevOps
-Infrastructure Automation
+Scheduled Automation
+Conditional Logic
+API Integration
+Issue Tracking
+Team Notifications
+Credential Management
+DevOps Automation
 ```
 
 ---
 
-## Author
+#  Project Goal
+
+The goal of this project is simple:
+
+> Automatically detect meaningful Redmine issue activity and communicate it to the development team through Mattermost without requiring engineers to manually check Redmine.
+
+The project demonstrates how DevOps automation can connect development and collaboration platforms to create a faster, more visible, and more reliable engineering workflow.
+
+---
+
+#  Author
 
 **Oluwaferanmi Dada**
 
 DevOps / Cloud Engineer
 
-GitHub: **feranzeey**
-
----
-
-## Project Goal
-
-The goal of this project is simple:
-
-> Automatically detect Redmine issue updates and make sure the right team members know about them without manually checking Redmine.
-
-This project demonstrates how DevOps automation can connect development tools together to create a faster and more reliable engineering workflow.
+**GitHub:** `feranzeey`
